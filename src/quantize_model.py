@@ -95,8 +95,11 @@ def quantize_model():
         out_xml = os.path.join(
             OPENVINO_INT8_NAME, f"openvino_{component}_model.xml"
         )
+        out_bin = os.path.join(
+            OPENVINO_INT8_NAME, f"openvino_{component}_model.bin"
+        )
         print(f"  保存 {component}...")
-        core.save_model(quantized_model, out_xml)
+        ov.serialize(quantized_model, out_xml, out_bin)
         print(f"    ✓ {component} 量化完成")
 
     for f in [
