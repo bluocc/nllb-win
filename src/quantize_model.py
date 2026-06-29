@@ -4,36 +4,56 @@ import numpy as np
 
 import openvino as ov
 import nncf
+from transformers import AutoTokenizer
 
 from src.config import OPENVINO_MODEL_NAME, OPENVINO_INT8_NAME
 
+CALIBRATION_SENTENCES = [
+    "The quick brown fox jumps over the lazy dog.",
+    "Artificial intelligence is transforming the world.",
+    "Please translate this sentence from English to Chinese.",
+    "Machine learning models require large amounts of data.",
+    "The weather today is sunny and warm.",
+    "I would like to book a flight to Paris.",
+    "Natural language processing is a field of AI.",
+    "The capital of France is Paris.",
+    "Deep learning has achieved great success recently.",
+    "Could you please help me with this problem?",
+]
 
-def _generate_calibration_data(model_xml, num_samples=50, max_seq_len=128):
-    core = ov.Core()
-    model = core.read_model(model_xml)
+
+def _make_calib_data(model, tokenizer, sentences, max_seq_len=64):
     inputs = model.inputs
+
     calib_data = []
-    for _ in range(num_samples):
+    for s in sentences[:10]:
+        tokens = tokenizer(
+            s,
+            return_tensors="np",
+            padding="max_length",
+            truncation=True,
+            max_length=max_seq_len,
+        )
         feed_dict = {}
         for inp in inputs:
-            partial_shape = inp.partial_shape
+            name = inp.any_name
             shape = []
-            for dim in partial_shape:
-                if dim.is_static:
-                    shape.append(dim.get_length())
-                else:
-                    shape.append(max_seq_len)
-            shape = [max(1, s) for s in shape]
-            shape = tuple(int(s) for s in shape)
+            for dim in inp.partial_shape:
+                shape.append(dim.get_length() if dim.is_static else max_seq_len)
+            shape = tuple(max(1, int(s)) for s in shape)
+
             if inp.element_type == ov.Type.i32:
-                feed_dict[inp.any_name] = np.random.randint(
-                    0, 100, shape
-                ).astype(np.int32)
+                if "input_ids" in name:
+                    feed_dict[name] = tokens["input_ids"].astype(np.int32)
+                elif "attention_mask" in name or "mask" in name.lower():
+                    feed_dict[name] = tokens["attention_mask"].astype(np.int32)
+                else:
+                    feed_dict[name] = np.zeros(shape, dtype=np.int32)
             else:
-                feed_dict[inp.any_name] = np.random.randn(*shape).astype(
-                    np.float32
-                )
+                feed_dict[name] = np.zeros(shape, dtype=np.float32)
+
         calib_data.append(feed_dict)
+
     return calib_data
 
 
@@ -43,6 +63,9 @@ def quantize_model():
         return
 
     os.makedirs(OPENVINO_INT8_NAME, exist_ok=True)
+
+    print("  加载 Tokenizer...")
+    tokenizer = AutoTokenizer.from_pretrained(OPENVINO_MODEL_NAME)
 
     core = ov.Core()
     components = ["encoder", "decoder"]
@@ -58,15 +81,15 @@ def quantize_model():
         print(f"  读取 {component} 模型...")
         ov_model = core.read_model(xml_path)
 
-        print(f"  生成 {component} 校准数据...")
-        calib_data = _generate_calibration_data(xml_path)
+        print(f"  生成 {component} 校准数据（10 条样本）...")
+        calib_data = _make_calib_data(ov_model, tokenizer, CALIBRATION_SENTENCES)
 
         print(f"  量化 {component}（INT8）...")
         quantized_model = nncf.quantize(
             ov_model,
             nncf.Dataset(calib_data),
             model_type=nncf.ModelType.TRANSFORMER,
-            subset_size=min(len(calib_data), 50),
+            subset_size=10,
         )
 
         out_xml = os.path.join(
@@ -91,9 +114,7 @@ def quantize_model():
         dst = os.path.join(OPENVINO_INT8_NAME, "encoder")
         os.makedirs(dst, exist_ok=True)
         for f in os.listdir(encoder_sub):
-            shutil.copy2(
-                os.path.join(encoder_sub, f), os.path.join(dst, f)
-            )
+            shutil.copy2(os.path.join(encoder_sub, f), os.path.join(dst, f))
 
     print("  INT8 量化全部完成！")
 
