@@ -52,7 +52,7 @@ def check_model():
 def check_export():
     from src.config import OPENVINO_MODEL_NAME
 
-    xml_path = os.path.join(OPENVINO_MODEL_NAME, "openvino_model.xml")
+    xml_path = os.path.join(OPENVINO_MODEL_NAME, "openvino_encoder_model.xml")
     if os.path.isfile(xml_path):
         print("  ✓ OpenVINO 模型已编译")
     else:

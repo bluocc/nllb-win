@@ -20,6 +20,7 @@ class Translator:
         )
 
         print("模型加载完成！")
+        print(f"  模型加载设备: {self.model._device}")
 
     def translate(self, text: str, source_lang: str):
 
@@ -46,10 +47,11 @@ class Translator:
 
 if __name__ == "__main__":
     translator = Translator()
-    text = "Link to another item"
-    print(
-        translator.translate(
-            text,
-            detect_language(text),
-        )
-    )
+    print(f"  模型加载设备: {translator.model._device}")
+    # text = "Link to another item"
+    # print(
+    #     translator.translate(
+    #         text,
+    #         detect_language(text),
+    #     )
+    # )
