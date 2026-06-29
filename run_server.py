@@ -67,7 +67,7 @@ def check_quantize():
 
     xml_path = os.path.join(OPENVINO_INT8_NAME, "openvino_encoder_model.xml")
     if os.path.isfile(xml_path):
-        print("  ✓ INT8 量化模型已就绪")
+        print("  ✓ INT8 模型已就绪（默认使用）")
     else:
         print("  ↓ INT8 模型未量化，开始量化...")
         from src.quantize_model import quantize_model
@@ -98,6 +98,7 @@ def main():
     print()
     print("-" * 50)
     print("  启动服务器：http://localhost:5000")
+    print("  （默认使用 INT8 模型，FP16 作为备选）")
     print("-" * 50)
     print()
 

@@ -81,40 +81,31 @@ def quantize_model():
     tokenizer = AutoTokenizer.from_pretrained(OPENVINO_MODEL_NAME)
 
     core = ov.Core()
-    components = ["encoder", "decoder"]
 
-    for component in components:
-        xml_path = os.path.join(
-            OPENVINO_MODEL_NAME, f"openvino_{component}_model.xml"
+    print("  量化 encoder（INT8）...")
+    encoder_xml = os.path.join(OPENVINO_MODEL_NAME, "openvino_encoder_model.xml")
+    ov_encoder = core.read_model(encoder_xml)
+    calib_data = _make_calib_data(ov_encoder, tokenizer, CALIBRATION_SENTENCES)
+    quantized_encoder = nncf.quantize(
+        ov_encoder,
+        nncf.Dataset(calib_data),
+        model_type=nncf.ModelType.TRANSFORMER,
+        subset_size=10,
+    )
+    out_xml = os.path.join(OPENVINO_INT8_NAME, "openvino_encoder_model.xml")
+    out_bin = os.path.join(OPENVINO_INT8_NAME, "openvino_encoder_model.bin")
+    ov.serialize(quantized_encoder, out_xml, out_bin)
+    print("    ✓ encoder 量化完成")
+
+    print("  复制 decoder（保持 FP16）...")
+    for ext in [".xml", ".bin"]:
+        shutil.copy2(
+            os.path.join(OPENVINO_MODEL_NAME, f"openvino_decoder_model{ext}"),
+            os.path.join(OPENVINO_INT8_NAME, f"openvino_decoder_model{ext}"),
         )
-        if not os.path.isfile(xml_path):
-            print(f"  跳过 {component}：{xml_path} 不存在")
-            continue
+    print("    ✓ decoder 复制完成")
 
-        print(f"  读取 {component} 模型...")
-        ov_model = core.read_model(xml_path)
-
-        print(f"  生成 {component} 校准数据（10 条样本）...")
-        calib_data = _make_calib_data(ov_model, tokenizer, CALIBRATION_SENTENCES)
-
-        print(f"  量化 {component}（INT8）...")
-        quantized_model = nncf.quantize(
-            ov_model,
-            nncf.Dataset(calib_data),
-            model_type=nncf.ModelType.TRANSFORMER,
-            subset_size=10,
-        )
-
-        out_xml = os.path.join(
-            OPENVINO_INT8_NAME, f"openvino_{component}_model.xml"
-        )
-        out_bin = os.path.join(
-            OPENVINO_INT8_NAME, f"openvino_{component}_model.bin"
-        )
-        print(f"  保存 {component}...")
-        ov.serialize(quantized_model, out_xml, out_bin)
-        print(f"    ✓ {component} 量化完成")
-
+    print("  复制配置文件...")
     for f in [
         "config.json",
         "generation_config.json",

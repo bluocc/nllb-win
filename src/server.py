@@ -19,8 +19,8 @@ LANGUAGE_NAMES = {
 }
 
 app = Flask(__name__)
-fp16_translator = None
 int8_translator = None
+fp16_translator = None
 
 
 def _get_source_lang(text, source_lang):
@@ -34,11 +34,11 @@ def _get_source_lang(text, source_lang):
     return source_lang, None
 
 
-def get_fp16(model_path=OPENVINO_MODEL_NAME):
-    global fp16_translator
-    if fp16_translator is None and os.path.isdir(model_path):
-        fp16_translator = Translator(model_path)
-    return fp16_translator
+def get_default():
+    t = get_int8()
+    if t is None:
+        t = get_fp16()
+    return t
 
 
 def get_int8():
@@ -46,6 +46,13 @@ def get_int8():
     if int8_translator is None and os.path.isdir(OPENVINO_INT8_NAME):
         int8_translator = Translator(OPENVINO_INT8_NAME)
     return int8_translator
+
+
+def get_fp16():
+    global fp16_translator
+    if fp16_translator is None and os.path.isdir(OPENVINO_MODEL_NAME):
+        fp16_translator = Translator(OPENVINO_MODEL_NAME)
+    return fp16_translator
 
 
 @app.route("/")
@@ -63,12 +70,14 @@ def translate():
     if err:
         return jsonify({"error": err}), 400
 
-    t = get_fp16()
+    t = get_default()
     if t is None:
-        return jsonify({"error": "FP16 模型未加载"}), 500
+        return jsonify({"error": "没有可用的模型"}), 500
 
+    start = time.time()
     result = t.translate(text, source_lang)
-    return jsonify({"translation": result})
+    elapsed = time.time() - start
+    return jsonify({"translation": result, "time": round(elapsed, 3)})
 
 
 @app.route("/languages")
@@ -87,7 +96,7 @@ def compare():
         return jsonify({"error": err}), 400
 
     results = {}
-    for model_type, fn in [("fp16", get_fp16), ("int8", get_int8)]:
+    for model_type, fn in [("int8", get_int8), ("fp16", get_fp16)]:
         t = fn()
         if t is None:
             results[model_type] = None
@@ -111,9 +120,11 @@ def model_status():
     int8_ok = os.path.isdir(OPENVINO_INT8_NAME) and os.path.isfile(
         os.path.join(OPENVINO_INT8_NAME, "openvino_encoder_model.xml")
     )
+    active = "int8" if int8_ok else ("fp16" if fp16_ok else None)
     return jsonify({
         "fp16": fp16_ok,
         "int8": int8_ok,
+        "active": active,
     })
 
 
@@ -127,7 +138,7 @@ def delete_model():
     elif model_type == "int8":
         path = OPENVINO_INT8_NAME
     else:
-        return jsonify({"error": "无效的模型类型，请指定 fp16 或 int8"}), 400
+        return jsonify({"error": "无效的模型类型"}), 400
 
     if not os.path.isdir(path):
         return jsonify({"error": "模型目录不存在"}), 400
@@ -140,3 +151,12 @@ def delete_model():
         int8_translator = None
 
     return jsonify({"success": True, "deleted": model_type})
+
+
+# 模块加载时预加载默认模型
+if os.path.isdir(OPENVINO_INT8_NAME):
+    print("  预加载 INT8 模型...")
+    get_int8()
+elif os.path.isdir(OPENVINO_MODEL_NAME):
+    print("  预加载 FP16 模型...")
+    get_fp16()
