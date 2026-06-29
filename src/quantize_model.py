@@ -10,15 +10,55 @@ from src.config import OPENVINO_MODEL_NAME, OPENVINO_INT8_NAME
 
 CALIBRATION_SENTENCES = [
     "The quick brown fox jumps over the lazy dog.",
-    "Artificial intelligence is transforming the world.",
+    "Artificial intelligence is transforming the way we live and work.",
     "Please translate this sentence from English to Chinese.",
-    "Machine learning models require large amounts of data.",
-    "The weather today is sunny and warm.",
-    "I would like to book a flight to Paris.",
-    "Natural language processing is a field of AI.",
-    "The capital of France is Paris.",
-    "Deep learning has achieved great success recently.",
-    "Could you please help me with this problem?",
+    "Machine learning models require large amounts of training data.",
+    "The weather today is sunny and warm with a light breeze.",
+    "I would like to book a flight to Paris for next Monday.",
+    "Natural language processing is a rapidly evolving field of AI.",
+    "The capital of France is Paris, known for its art and culture.",
+    "Deep learning has achieved great success in recent years.",
+    "Could you please help me with this difficult problem?",
+    "The United Nations was founded in 1945 after World War Two.",
+    "She walked to the store to buy some groceries for dinner.",
+    "The professor gave a fascinating lecture on quantum physics.",
+    "Scientists have discovered a new species of butterfly in the Amazon.",
+    "The company announced record profits for the third quarter.",
+    "Please send me the report by the end of the business day.",
+    "The patient showed significant improvement after the treatment.",
+    "A new study reveals the benefits of meditation for mental health.",
+    "The concert was attended by over ten thousand enthusiastic fans.",
+    "Global temperatures have risen by one point five degrees Celsius.",
+    "The restaurant serves authentic Italian cuisine made with fresh ingredients.",
+    "Students must submit their assignments before the deadline.",
+    "The government has implemented new policies to reduce carbon emissions.",
+    "She published her research paper in a prestigious scientific journal.",
+    "The film tells the story of a young musician overcoming adversity.",
+    "Please make sure to bring your passport and visa documents.",
+    "The economic outlook for next year remains uncertain but optimistic.",
+    "They are building a new hospital in the downtown area.",
+    "The athlete broke the world record by an impressive margin.",
+    "Our team developed a new algorithm for image recognition tasks.",
+    "The museum features an extensive collection of modern art.",
+    "Please confirm your attendance by replying to this email.",
+    "The earthquake caused significant damage to historical buildings.",
+    "Children should eat a balanced diet rich in fruits and vegetables.",
+    "The novel explores themes of identity and belonging in modern society.",
+    "He has been working on this project for over three years now.",
+    "The price of oil has fluctuated dramatically this year.",
+    "Women in STEM fields continue to break barriers and inspire others.",
+    "The spacecraft successfully landed on the surface of Mars.",
+    "We need to consider the environmental impact of our decisions.",
+    "The university offers scholarships for international students.",
+    "She trained for months to prepare for the marathon race.",
+    "The new smartphone features a high resolution camera and long battery life.",
+    "Internet access has become essential for education and communication.",
+    "The committee will review all applications before making a decision.",
+    "Ancient civilizations built remarkable structures that still stand today.",
+    "The stock market showed signs of recovery after the downturn.",
+    "Please include your full name and contact information in the form.",
+    "The city is known for its vibrant nightlife and cultural diversity.",
+    "Researchers are exploring new treatments for rare genetic disorders.",
 ]
 
 
@@ -35,11 +75,11 @@ def _copy_ignore_errors(src_dir, dst_dir):
                 pass
 
 
-def _make_calib_data(model, tokenizer, sentences, max_seq_len=64):
+def _make_calib_data(model, tokenizer, sentences, max_seq_len=128):
     inputs = model.inputs
 
     calib_data = []
-    for s in sentences[:10]:
+    for s in sentences[:50]:
         tokens = tokenizer(
             s,
             return_tensors="np",
@@ -90,7 +130,7 @@ def quantize_model():
         ov_encoder,
         nncf.Dataset(calib_data),
         model_type=nncf.ModelType.TRANSFORMER,
-        subset_size=10,
+        subset_size=50,
     )
     out_xml = os.path.join(OPENVINO_INT8_NAME, "openvino_encoder_model.xml")
     out_bin = os.path.join(OPENVINO_INT8_NAME, "openvino_encoder_model.bin")
