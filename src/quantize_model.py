@@ -22,6 +22,19 @@ CALIBRATION_SENTENCES = [
 ]
 
 
+def _copy_ignore_errors(src_dir, dst_dir):
+    try:
+        shutil.copytree(src_dir, dst_dir, dirs_exist_ok=True, ignore_dangling_symlinks=True)
+    except Exception as e:
+        print(f"  警告：复制 {src_dir} 时出错（{e}），跳过...")
+        os.makedirs(dst_dir, exist_ok=True)
+        for f in os.listdir(src_dir):
+            try:
+                shutil.copy2(os.path.join(src_dir, f), os.path.join(dst_dir, f))
+            except Exception:
+                pass
+
+
 def _make_calib_data(model, tokenizer, sentences, max_seq_len=64):
     inputs = model.inputs
 
@@ -114,10 +127,7 @@ def quantize_model():
 
     encoder_sub = os.path.join(OPENVINO_MODEL_NAME, "encoder")
     if os.path.isdir(encoder_sub):
-        dst = os.path.join(OPENVINO_INT8_NAME, "encoder")
-        os.makedirs(dst, exist_ok=True)
-        for f in os.listdir(encoder_sub):
-            shutil.copy2(os.path.join(encoder_sub, f), os.path.join(dst, f))
+        _copy_ignore_errors(encoder_sub, os.path.join(OPENVINO_INT8_NAME, "encoder"))
 
     print("  INT8 量化全部完成！")
 
