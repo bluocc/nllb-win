@@ -62,6 +62,19 @@ def check_export():
         export_model()
 
 
+def check_quantize():
+    from src.config import OPENVINO_INT8_NAME
+
+    xml_path = os.path.join(OPENVINO_INT8_NAME, "openvino_encoder_model.xml")
+    if os.path.isfile(xml_path):
+        print("  ✓ INT8 量化模型已就绪")
+    else:
+        print("  ↓ INT8 模型未量化，开始量化...")
+        from src.quantize_model import quantize_model
+
+        quantize_model()
+
+
 def main():
     if not in_venv():
         setup_venv_and_restart()
@@ -73,11 +86,14 @@ def main():
     print("=" * 50)
     print()
 
-    print("[1/2] 检查模型...")
+    print("[1/3] 检查模型...")
     check_model()
 
-    print("[2/2] 检查 OpenVINO 模型...")
+    print("[2/3] 检查 OpenVINO 模型...")
     check_export()
+
+    print("[3/3] 检查 INT8 量化模型...")
+    check_quantize()
 
     print()
     print("-" * 50)

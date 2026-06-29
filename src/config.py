@@ -5,8 +5,11 @@
 # Hugging Face 模型
 MODEL_NAME = "facebook/nllb-200-distilled-1.3B"
 
-# OpenVINO 模型路径
+# OpenVINO 模型路径（FP16）
 OPENVINO_MODEL_NAME = "models/openvino"
+
+# OpenVINO INT8 量化模型路径
+OPENVINO_INT8_NAME = "models/openvino_int8"
 
 # OpenVINO 推理设备
 DEVICE = "GPU"
@@ -25,5 +28,3 @@ LANGUAGE_MAP = {
     "de": "deu_Latn",
     "zh-cn": "zho_Hans",
 }
-#OpenVINO是否重新导出
-EXPORT_OPENVINO = False

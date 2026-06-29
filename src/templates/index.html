@@ -9,12 +9,12 @@
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             background: #f0f2f5;
-            display: flex; justify-content: center; align-items: center;
+            display: flex; justify-content: center; align-items: flex-start;
             min-height: 100vh; padding: 20px;
         }
         .card {
             background: #fff; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.08);
-            padding: 32px; width: 100%; max-width: 640px;
+            padding: 32px; width: 100%; max-width: 800px; margin-top: 20px;
         }
         h1 { font-size: 22px; color: #1a1a1a; margin-bottom: 24px; text-align: center; }
         .row { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
@@ -28,6 +28,7 @@
         textarea {
             width: 100%; min-height: 120px; padding: 12px; border: 1px solid #d9d9d9;
             border-radius: 6px; resize: vertical; outline: none; line-height: 1.6;
+            font-family: inherit;
         }
         textarea:focus { border-color: #4096ff; box-shadow: 0 0 0 2px rgba(64,150,255,0.1); }
         .result-box {
@@ -36,6 +37,29 @@
             margin-top: 8px; overflow-y: auto;
         }
         .result-box.loading { color: #999; }
+        .mode-tabs {
+            display: flex; gap: 0; margin-bottom: 20px; border-bottom: 2px solid #e8e8e8;
+        }
+        .mode-tab {
+            padding: 10px 24px; cursor: pointer; font-size: 14px; color: #666;
+            border-bottom: 2px solid transparent; margin-bottom: -2px;
+            transition: all 0.2s; user-select: none;
+        }
+        .mode-tab:hover { color: #4096ff; }
+        .mode-tab.active { color: #1677ff; border-bottom-color: #1677ff; font-weight: 500; }
+        .compare-grid {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 8px;
+        }
+        .compare-col h3 {
+            font-size: 14px; color: #666; margin-bottom: 4px; font-weight: 500;
+        }
+        .compare-col h3 .tag {
+            display: inline-block; padding: 1px 8px; border-radius: 4px;
+            font-size: 11px; margin-left: 6px; font-weight: 600;
+        }
+        .tag-fp16 { background: #e6f4ff; color: #1677ff; }
+        .tag-int8 { background: #f6ffed; color: #52c41a; }
+        .tag-time { font-size: 12px; color: #999; font-weight: 400; margin-left: 8px; }
         .btn {
             padding: 10px 32px; background: #1677ff; color: #fff; border: none;
             border-radius: 6px; cursor: pointer; font-size: 15px; font-weight: 500;
@@ -43,6 +67,15 @@
         }
         .btn:hover { background: #4096ff; }
         .btn:disabled { background: #a0c4ff; cursor: not-allowed; }
+        .btn-sm {
+            padding: 6px 16px; font-size: 13px; border-radius: 4px; border: none;
+            cursor: pointer; transition: background 0.2s; font-weight: 500;
+        }
+        .btn-danger { background: #ff4d4f; color: #fff; }
+        .btn-danger:hover { background: #ff7875; }
+        .btn-danger:disabled { background: #ffa39e; cursor: not-allowed; }
+        .btn-outline { background: transparent; color: #666; border: 1px solid #d9d9d9; }
+        .btn-outline:hover { color: #1677ff; border-color: #1677ff; }
         .actions { display: flex; justify-content: center; margin: 16px 0; }
         .status {
             display: flex; align-items: center; justify-content: center; gap: 6px;
@@ -50,11 +83,31 @@
         }
         .status .dot { width: 8px; height: 8px; border-radius: 50%; background: #52c41a; }
         .error { color: #ff4d4f; font-size: 13px; text-align: center; margin-top: 8px; }
+        .model-bar {
+            display: flex; align-items: center; justify-content: center; gap: 16px;
+            margin-top: 20px; padding-top: 16px; border-top: 1px solid #f0f0f0;
+            font-size: 13px; color: #666; flex-wrap: wrap;
+        }
+        .model-bar .model-item {
+            display: flex; align-items: center; gap: 6px;
+        }
+        .model-bar .dot-sm { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+        .dot-green { background: #52c41a; }
+        .dot-gray { background: #d9d9d9; }
+        .hidden { display: none; }
+        .compare-only { display: none; }
+        .compare-mode .compare-only { display: block; }
+        .compare-mode .normal-only { display: none; }
     </style>
 </head>
 <body>
     <div class="card">
         <h1>NLLB 翻译服务</h1>
+
+        <div class="mode-tabs">
+            <div class="mode-tab active" data-mode="normal" onclick="switchMode('normal')">普通翻译</div>
+            <div class="mode-tab" data-mode="compare" onclick="switchMode('compare')">对比翻译</div>
+        </div>
 
         <div class="row">
             <label>源语言</label>
@@ -72,8 +125,31 @@
             <button class="btn" id="translateBtn" onclick="doTranslate()">翻 译</button>
         </div>
 
-        <div class="result-box" id="resultBox">翻译结果将显示在这里</div>
+        <div id="normalResult">
+            <div class="result-box" id="resultBox">翻译结果将显示在这里</div>
+        </div>
+
+        <div id="compareResult" class="hidden">
+            <div class="compare-grid">
+                <div class="compare-col">
+                    <h3>FP16 <span class="tag tag-fp16">当前</span><span class="tag-time" id="fp16Time"></span></h3>
+                    <div class="result-box" id="fp16Result">—</div>
+                </div>
+                <div class="compare-col">
+                    <h3>INT8 <span class="tag tag-int8">量化</span><span class="tag-time" id="int8Time"></span></h3>
+                    <div class="result-box" id="int8Result">—</div>
+                </div>
+            </div>
+        </div>
+
         <div class="error" id="errorMsg"></div>
+
+        <div class="model-bar" id="modelBar">
+            <span>模型状态：</span>
+            <span class="model-item"><span class="dot-sm dot-green" id="fp16Dot"></span> FP16 <span id="fp16Label">加载中...</span></span>
+            <span class="model-item"><span class="dot-sm dot-gray" id="int8Dot"></span> INT8 <span id="int8Label">检查中...</span></span>
+            <span id="deleteArea"></span>
+        </div>
 
         <div class="status">
             <span class="dot"></span>
@@ -82,47 +158,149 @@
     </div>
 
     <script>
+        let isCompareMode = false;
+
+        function switchMode(mode) {
+            isCompareMode = mode === 'compare';
+            document.querySelectorAll('.mode-tab').forEach(t => t.classList.toggle('active', t.dataset.mode === mode));
+            document.getElementById('normalResult').classList.toggle('hidden', isCompareMode);
+            document.getElementById('compareResult').classList.toggle('hidden', !isCompareMode);
+        }
+
+        function updateModelStatus() {
+            fetch('/model-status')
+                .then(r => r.json())
+                .then(data => {
+                    const fp16Dot = document.getElementById('fp16Dot');
+                    const int8Dot = document.getElementById('int8Dot');
+                    const fp16Label = document.getElementById('fp16Label');
+                    const int8Label = document.getElementById('int8Label');
+                    const deleteArea = document.getElementById('deleteArea');
+
+                    fp16Dot.className = 'dot-sm ' + (data.fp16 ? 'dot-green' : 'dot-gray');
+                    int8Dot.className = 'dot-sm ' + (data.int8 ? 'dot-green' : 'dot-gray');
+                    fp16Label.textContent = data.fp16 ? '已就绪' : '未找到';
+                    int8Label.textContent = data.int8 ? '已就绪' : '未找到';
+
+                    let html = '';
+                    if (data.fp16) {
+                        html += `<button class="btn-sm btn-danger" onclick="deleteModel('fp16')">删除 FP16</button> `;
+                    }
+                    if (data.int8) {
+                        html += `<button class="btn-sm btn-danger" onclick="deleteModel('int8')">删除 INT8</button> `;
+                    }
+                    deleteArea.innerHTML = html;
+                });
+        }
+
+        function deleteModel(type) {
+            if (!confirm(`确定要删除 ${type.toUpperCase()} 模型吗？此操作不可恢复。`)) return;
+            fetch('/delete-model', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ model: type }),
+            })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        updateModelStatus();
+                        showError('');
+                    } else {
+                        showError(data.error || '删除失败');
+                    }
+                });
+        }
+
+        function showError(msg) {
+            document.getElementById('errorMsg').textContent = msg;
+        }
+
         async function doTranslate() {
             const text = document.getElementById('inputText').value.trim();
             const lang = document.getElementById('srcLang').value;
             const btn = document.getElementById('translateBtn');
-            const resultBox = document.getElementById('resultBox');
             const errorMsg = document.getElementById('errorMsg');
 
-            if (!text) { errorMsg.textContent = '请输入要翻译的文本'; return; }
-            errorMsg.textContent = '';
+            if (!text) { showError('请输入要翻译的文本'); return; }
+            showError('');
 
             btn.disabled = true;
             btn.textContent = '翻译中...';
-            resultBox.textContent = '正在翻译...';
-            resultBox.className = 'result-box loading';
 
-            try {
-                const res = await fetch('/translate', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ text, source_lang: lang }),
-                });
-                const data = await res.json();
-                if (res.ok) {
-                    resultBox.textContent = data.translation;
-                    resultBox.className = 'result-box';
-                } else {
-                    errorMsg.textContent = data.error || '翻译失败';
+            if (isCompareMode) {
+                document.getElementById('fp16Result').textContent = '翻译中...';
+                document.getElementById('fp16Result').className = 'result-box loading';
+                document.getElementById('int8Result').textContent = '翻译中...';
+                document.getElementById('int8Result').className = 'result-box loading';
+                document.getElementById('fp16Time').textContent = '';
+                document.getElementById('int8Time').textContent = '';
+
+                try {
+                    const res = await fetch('/compare', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ text, source_lang: lang }),
+                    });
+                    const data = await res.json();
+                    if (res.ok) {
+                        const fp16 = document.getElementById('fp16Result');
+                        const int8 = document.getElementById('int8Result');
+                        if (data.fp16) {
+                            fp16.textContent = data.fp16.translation;
+                            fp16.className = 'result-box';
+                            document.getElementById('fp16Time').textContent = data.fp16.time + 's';
+                        } else {
+                            fp16.textContent = '（模型不可用）';
+                            fp16.className = 'result-box';
+                        }
+                        if (data.int8) {
+                            int8.textContent = data.int8.translation;
+                            int8.className = 'result-box';
+                            document.getElementById('int8Time').textContent = data.int8.time + 's';
+                        } else {
+                            int8.textContent = '（模型不可用）';
+                            int8.className = 'result-box';
+                        }
+                    } else {
+                        showError(data.error || '翻译失败');
+                    }
+                } catch (e) {
+                    showError('网络错误，请检查服务是否运行');
+                }
+            } else {
+                const resultBox = document.getElementById('resultBox');
+                resultBox.textContent = '正在翻译...';
+                resultBox.className = 'result-box loading';
+
+                try {
+                    const res = await fetch('/translate', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ text, source_lang: lang }),
+                    });
+                    const data = await res.json();
+                    if (res.ok) {
+                        resultBox.textContent = data.translation;
+                        resultBox.className = 'result-box';
+                    } else {
+                        showError(data.error || '翻译失败');
+                        resultBox.textContent = '';
+                    }
+                } catch (e) {
+                    showError('网络错误，请检查服务是否运行');
                     resultBox.textContent = '';
                 }
-            } catch (e) {
-                errorMsg.textContent = '网络错误，请检查服务是否运行';
-                resultBox.textContent = '';
-            } finally {
-                btn.disabled = false;
-                btn.textContent = '翻 译';
             }
+
+            btn.disabled = false;
+            btn.textContent = '翻 译';
         }
 
-        document.getElementById('inputText').addEventListener('keydown', function(e) {
+        document.getElementById('inputText').addEventListener('keydown', function (e) {
             if (e.key === 'Enter' && e.ctrlKey) doTranslate();
         });
+
+        updateModelStatus();
     </script>
 </body>
 </html>

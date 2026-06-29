@@ -3,19 +3,20 @@ from transformers import AutoTokenizer
 
 from src.config import MODEL_NAME, OPENVINO_MODEL_NAME, TARGET_LANGUAGE
 from src.config import DEVICE
-from src.config import EXPORT_OPENVINO
 from src.detector import detect_language
 
 
 class Translator:
 
-    def __init__(self):
-        print("正在加载 Tokenizer...")
-        self.tokenizer = AutoTokenizer.from_pretrained(OPENVINO_MODEL_NAME)
+    def __init__(self, model_path=None):
+        if model_path is None:
+            model_path = OPENVINO_MODEL_NAME
+        print(f"正在加载 Tokenizer ({model_path})...")
+        self.tokenizer = AutoTokenizer.from_pretrained(model_path)
 
-        print("正在加载 OpenVINO 模型...")
+        print(f"正在加载 OpenVINO 模型 ({model_path})...")
         self.model = OVModelForSeq2SeqLM.from_pretrained(
-            OPENVINO_MODEL_NAME,
+            model_path,
             device=DEVICE,
         )
 
@@ -45,13 +46,7 @@ class Translator:
 
         return result[0]
 
+
 if __name__ == "__main__":
     translator = Translator()
     print(f"  模型加载设备: {translator.model._device}")
-    # text = "Link to another item"
-    # print(
-    #     translator.translate(
-    #         text,
-    #         detect_language(text),
-    #     )
-    # )
